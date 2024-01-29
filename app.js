@@ -5,6 +5,8 @@ const ejs = require("ejs");
 const mongoose = require("mongoose");
 const encrypt = require("mongoose-encryption");
 const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 
 const app = express();
 
@@ -37,27 +39,36 @@ app.get("/register",function(req,res){
 });
 
 app.post("/register",function(req,res){
-    const newuser = new user({
-        username:req.body.username,
-        password:md5(req.body.password)
+    
+    bcrypt.hash(req.body.password, saltRounds).then(function(hash) {
+        const newuser = new user({
+            username:req.body.username,
+            password:hash
+        });
+        newuser.save().then(function(){
+            res.render("secrets");
+        }).catch(function(err){
+            console.log("internal server error occured",err);
+        });
     });
-    newuser.save().then(function(){
-        res.render("secrets");
-    }).catch(function(err){
-        console.log("internal server error occured",err);
-    });
+
+    
 });
 
 app.post("/login",function(req,res){
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = req.body.password;
     user.findOne({'username':username}).then(function(found){
         if(found){
-            if(found.password===password){
-                res.render("secrets");
-            }else{
-                res.send("wrong password")
-            }
+            bcrypt.compare(password, found.password, function(err, result) {
+                console.log(result);
+                if(result){
+                    res.render("secrets");
+                }else{
+                    res.send("wrong password")
+                }
+            });
+            
         }else{
             res.send("user not found");
         }
